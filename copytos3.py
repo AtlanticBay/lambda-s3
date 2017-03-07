@@ -25,7 +25,7 @@ class error(Document):
 def lambda_handler(event, context):
     #print("Received event: " + json.dumps(event, indent=2))
     # Connect to mongo
-    connect('hztest', host='ec2-52-91-110-103.compute-1.amazonaws.com', port=27017)
+    connect('dbname', host='hostname', port=27017)
     # Get the object from the event and show its content type
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = urllib.unquote_plus(event['Records'][0]['s3']['object']['key'].encode('utf8'))
