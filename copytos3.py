@@ -1,6 +1,8 @@
 from __future__ import print_function
 from mongoengine import *
-import json, urllib, boto3, datetime
+from datetime import datetime
+from dateutil.parser import parse
+import json, urllib, boto3, datetime, pytz
 
 print('Loading function')
 
@@ -14,6 +16,7 @@ class logs(Document):
     taskName = StringField()
     url = StringField()
     dateCreated = DateTimeField()
+    tzNaive = DateTimeField()
     errorCount = IntField()
 
 class jobs(Document):
@@ -27,8 +30,6 @@ class error(Document):
 
 def lambda_handler(event, context):
     #print("Received event: " + json.dumps(event, indent=2))
-    # Connect to mongo
-    connect('dbname', host='hostname', port=27017)
     # Get the object from the event and show its content type
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = event['Records'][0]['s3']['object']['key']
@@ -44,11 +45,16 @@ def lambda_handler(event, context):
         else: 
             cnt=(dataFile.count('\n'))
         lastModified=obj.get()['ResponseMetadata']['HTTPHeaders']['x-amz-meta-lastwritetime']
+        offset=datetime.datetime.now(pytz.timezone('US/Eastern')).strftime('%z')
+        lastModifiedOffset=lastModified+' '+offset
+        conversion=parse(lastModifiedOffset)
     except Exception as e:
         print(e)
         print('Error getting object {} from bucket {}. Make sure they exist and your bucket is in the same region as this function.'.format(key, bucket))
         raise e
     try:
+        # Connect to mongo
+        connect('dbname', host='hostname', port=27017)
         jobsobj=jobs.objects.get(objectId=objectId)
         post=logs(
             fullPath = key,
@@ -56,7 +62,8 @@ def lambda_handler(event, context):
             objectId = objectId,
             taskName = jobsobj.taskName,
             url = url,
-            dateCreated = lastModified,
+            dateCreated = conversion,
+            tzNaive = lastModified,
             errorCount = cnt
             )
         post.save()
